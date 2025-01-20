@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Edit Area Age
+// @name         WME Edit Area Age
 // @namespace    https://greasyfork.org/users/1365511
 // @version      2025.01.13.001
 // @description  Displays age of editable areas
