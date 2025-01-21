@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME Edit Area Age
 // @namespace    https://greasyfork.org/users/1365511
-// @version      2025.01.21.001
+// @version      2025.01.21.002
 // @description  Displays age of editable areas
 // @author       robosphinx_
 // @match        *://*.waze.com/*editor*
@@ -50,7 +50,7 @@
     // calculated based on drive traces and it's nothing obvious...
     // Time to break out the magic numbers </3
     // oof even the magic numbers don't fix this because it's varying with latitude still.
-    // I'm NOT going to find a magic equation to fudge the sizes dynamically.  This get's pretty close.
+    // I'm NOT going to find a magic equation to fudge the sizes dynamically.  This gets pretty close.
     const VERTICAL_SCALAR = 1.12;
     const HORIZONTAL_SCALAR = 0.90;
 
@@ -66,7 +66,8 @@
     let wmeeaaEditAgeLayer;
     let _$scanDrivesButton = null;
 
-    // Volatile things and stuff - changes on scan
+    // Volatile things and stuff - changes on user input
+    let layerEnabled = true;
     let centerAtProcessDrivesStart;
     let zoomAtProcessDrivesStart;
     let numDrives = 0;
@@ -75,7 +76,7 @@
 
     /*
      * log does what you expect.  Intended use is a severity and a message, but it really just
-     * appends the two string together.  Not really any rules on severity tags, but ERROR will
+     * appends the two strings together.  Not really any rules on severity tags, but ERROR will
      * be printed as an error to the js console.
      */
     function log(tag, message) {
@@ -258,10 +259,7 @@
             for (let cardIndex = 0; cardIndex < visibleCards.length; cardIndex++) {
                 //log("DEBUG", "Iterating over card " + cardIndex);
                 setTimeout(clickDriveAndCaptureDate(visibleCards[cardIndex]), totalDelay);
-                // setTimeout($(visibleCards[cardIndex]).click(), totalDelay);
-                // driveDates.push($(visibleCards[cardIndex]).find('.list-item-card-title')[0].innerText);
                 totalDelay += TIME_PER_DRIVE_MS;
-                // TODO: Get child class list-item-card-title for date of drive.  Add 90 days for expiration. Record in click order, then use that same order as processing from mapzoomend
             }
             //log("DEBUG", "Done with wz-card");
             //log("DEBUG", "Looking for paginator");
@@ -295,9 +293,8 @@
 
     function processedAllDrives() {
         try {
-            // TODO: Create a polygon for each drive age?  We really should be creating a map of all geoms with the associated date...  Or expiration?
-            // log("DEBUG", "Finished creating gargantuan geom.  Processed " + numDrives + " drives.");
-            // Update script panel label for number of geoms.  TODO: Probably remove later
+            // log("DEBUG", "Finished creating gargantuan geoms.  Processed " + numDrives + " drives.");
+            // Update script panel label for number of processed drives.  TODO: Probably remove later
             $('#wmeeaaDrives').text( numDrives );
             WM.events.unregister('moveend', null, mapMoveEnd);
             // Return to center and zoom from before we started
@@ -481,6 +478,14 @@
         return new OpenLayers.Geometry.LinearRing(points);
     }
 
+    /*
+     * Gets an approximate radius in meters of the earth at a given latitude.
+     * Useful for more locally accurate calculations.
+     * Would it be nice to be a flat-earther?  Yes.  It would make this whole thing much easier.
+     * Unfortunately the sphereical-earthers are wrong, too.  Turns out the earth is squishy
+     * enough to deform along the equator because that's what happens when you spin a really large
+     * mass really fast.  Science is cool.
+     */
     function getEarthRadiusMeters(latitudeRadians)
     {
         return Math.sqrt(
@@ -491,6 +496,10 @@
             ); /* End sqrt */
     }
 
+    /*
+     * Calculates new coordinates on a spheroid surface, given some initial point along with a
+     * direction and distance to the desired new point.
+     */
     function getNewCoordinates(latDegrees, lonDegrees, distanceMeters, bearingDegrees) {
         if (distanceMeters == 0) return new OpenLayers.Geometry.Point(lonDegrees, latDegrees);
 
@@ -521,6 +530,10 @@
         return new OpenLayers.Geometry.Point(toDegrees(newLonRadians) - lonDegrees, toDegrees(newLatRadians) - latDegrees);
     }
 
+    /*
+     * Calculates new coordinates on a spheroid surface, treating the input coordinates as the origin (0, 0)
+     * Creates relative or offset coordinates that include magic number scalars.
+     */
     function getNewScaledRelativeCoordinates(latDegrees, lonDegrees, distanceMeters, bearingDegrees) {
         let originalRelativePoint = getNewRelativeCoordinates(latDegrees, lonDegrees, distanceMeters, bearingDegrees);
         return new OpenLayers.Geometry.Point(originalRelativePoint.x * HORIZONTAL_SCALAR, originalRelativePoint.y * VERTICAL_SCALAR);
@@ -534,6 +547,12 @@
         return radians * 180 / Math.PI;
     }
 
+    /*
+     * Converts from
+     * degree with zero-north origin, increasing in the clockwise direction (earth, navigation)
+     * to
+     * radian with zero-west origin, increasing in the counterclockwise direction (math)
+     */
     function toRadiansZeroEastPositiveCCW(degrees) {
         // Flip across line y = x
         let inputRadians = toRadians(degrees);
@@ -545,6 +564,12 @@
         return flippedRadians;
     }
 
+    /*
+     * Converts from
+     * radian with zero-west origin, increasing in the counterclockwise direction (math)
+     * to
+     * degree with zero-north origin, increasing in the clockwise direction (earth, navigation)
+     */
     function toDegreesZeroNorthPositiveCW(radians) {
         // Flip across line y = x
         let inputX = Math.cos(radians);
@@ -554,6 +579,9 @@
         return toDegrees(flippedRadians);
     }
 
+    /*
+     * Takes the given pair of coordinates and calculates an approximate bearing betwixt them
+     */
     function getBearingFromCoordinatePair(lat1, lon1, lat2, lon2) {
         let lat1rad = toRadians(lat1);
         let lat2rad = toRadians(lat2);
@@ -573,8 +601,6 @@
         $('#wmeeaaDrives').text("Unknown! Please scan.");
         // $('#wmeeaaArea').text("Unknown! Please scan.");
     }
-
-    let layerEnabled = true;
 
     function onAgeLayerToggleChanged(checked) {
         wmeeaaEditAgeLayer.setVisibility(checked);
