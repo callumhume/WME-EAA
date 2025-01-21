@@ -6,4 +6,3 @@ WME Edit Area Age, or WME-EAA, scans an editor's drives history list for all dri
 ### Known issues
 - Editable area approximation does not perfectly extend to the limits of the WME-native editable area layer.  This is likely due to projection transformations.
 - Layer Z-height is not consistent.  Sometimes age polygons will shuffle when the map is zoomed or panned.
-- Editable area approximations are currently created with large circles at each point of the drive geometry instead of one all-encompassing polygon.  This is extremely inefficient and can cause panning and zooming to lag.
